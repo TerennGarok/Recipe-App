@@ -1,0 +1,60 @@
+# Starts a cloud build on Expo (EAS) from the GitHub website or app:
+# Actions tab → "Build app" → Run workflow.
+# Requires a repository secret EXPO_TOKEN (expo.dev → Account settings → Access tokens).
+# The build itself runs on Expo's servers; follow the link printed in the log, or open
+# expo.dev → your project → Builds, to download and install it.
+name: Build app
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Which phones
+        type: choice
+        options: [android, ios, all]
+        default: android
+      profile:
+        description: "preview = install directly on family phones; production = app stores / TestFlight"
+        type: choice
+        options: [preview, production]
+        default: preview
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check for Expo token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add a repository secret named EXPO_TOKEN (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Link the Expo project (creates it on the first run)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: npx --yes eas-cli@27 init --non-interactive --force
+
+      - name: Start the build on Expo
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: >
+          npx --yes eas-cli@27 build
+          --platform ${{ inputs.platform }}
+          --profile ${{ inputs.profile }}
+          --non-interactive --no-wait
