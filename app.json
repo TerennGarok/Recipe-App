@@ -1,0 +1,74 @@
+{
+  "expo": {
+    "name": "RecipeBox",
+    "slug": "recipebox",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "recipebox",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.terenngarok.recipebox",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.terenngarok.recipebox",
+      "adaptiveIcon": {
+        "backgroundColor": "#FBF7F2",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-sqlite",
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "RecipeBox uses your photos to scan recipes and attach pictures and videos of your dishes.",
+          "cameraPermission": "RecipeBox uses the camera to scan paper recipes and photograph your dishes.",
+          "microphonePermission": "RecipeBox records sound when you film a video of a dish."
+        }
+      ],
+      ["expo-secure-store", { "faceIDPermission": false, "configureAndroidBackup": true }],
+      ["expo-video", { "supportsPictureInPicture": true }],
+      [
+        "expo-sharing",
+        {
+          "ios": {
+            "enabled": true,
+            "activationRule": {
+              "supportsText": true,
+              "supportsWebUrlWithMaxCount": 1,
+              "supportsWebPageWithMaxCount": 1,
+              "supportsImageWithMaxCount": 10,
+              "supportsFileWithMaxCount": 1
+            }
+          },
+          "android": {
+            "enabled": true,
+            "singleShareMimeTypes": ["text/plain", "image/*", "application/json", "application/octet-stream"],
+            "multipleShareMimeTypes": ["image/*"]
+          }
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#FBF7F2",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
