@@ -10,11 +10,11 @@
     "platforms": ["ios", "android"],
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.example.recipebox",
+      "bundleIdentifier": "com.terenngarok.recipebox",
       "supportsTablet": true
     },
     "android": {
-      "package": "com.example.recipebox",
+      "package": "com.terenngarok.recipebox",
       "adaptiveIcon": {
         "backgroundColor": "#FBF7F2",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

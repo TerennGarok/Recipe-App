@@ -37,7 +37,7 @@ npx eas-cli@latest build --profile preview --platform ios       # ad-hoc build f
 
 - **Android:** download the APK link from the build page on each phone and install it.
 - **iPhone:** installing on your own and family iPhones requires an [Apple Developer Program](https://developer.apple.com/programs/) membership ($99/yr). Then either register each family iPhone for ad-hoc builds (`eas device:create`), or upload with `eas submit` and invite family through TestFlight (simpler for several people).
-- Before building, change `ios.bundleIdentifier` and `android.package` in `app.json` from `com.example.recipebox` to something unique to you (e.g. `com.yourname.recipebox`). EAS creates the App Group the iOS share extension needs.
+- The app's bundle ID is `com.terenngarok.recipebox` (`ios.bundleIdentifier` and `android.package` in `app.json`). Don't change it after family members have installed the app: phones would treat it as a new, empty app. EAS creates the App Group the iOS share extension needs.
 
 For day-to-day development: `npx eas-cli build --profile development`, install that build once, then `npm start` and changes load live.
 
