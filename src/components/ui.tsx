@@ -157,6 +157,9 @@ export function PromptModal({
   placeholder,
   onSubmit,
   onCancel,
+  keyboardType = 'url',
+  submitLabel = 'Add',
+  initialValue = '',
 }: {
   visible: boolean;
   title: string;
@@ -164,19 +167,22 @@ export function PromptModal({
   placeholder?: string;
   onSubmit: (value: string) => void;
   onCancel: () => void;
+  keyboardType?: TextInputProps['keyboardType'];
+  submitLabel?: string;
+  initialValue?: string;
 }) {
   const t = useTheme();
   const [value, setValue] = useState('');
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel} onShow={() => setValue('')}>
+    <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel} onShow={() => setValue(initialValue)}>
       <View style={styles.overlay}>
         <View style={[styles.overlayBox, { backgroundColor: t.card, alignItems: 'stretch', width: '100%' }]}>
           <T kind="heading">{title}</T>
           {message ? <T kind="secondary">{message}</T> : null}
-          <Field value={value} onChangeText={setValue} placeholder={placeholder} autoCapitalize="none" autoCorrect={false} keyboardType="url" autoFocus />
+          <Field value={value} onChangeText={setValue} placeholder={placeholder} autoCapitalize="none" autoCorrect={false} keyboardType={keyboardType} autoFocus />
           <View style={{ flexDirection: 'row', gap: Spacing.sm, justifyContent: 'flex-end' }}>
             <Button title="Cancel" variant="ghost" onPress={onCancel} />
-            <Button title="Add" onPress={() => onSubmit(value.trim())} disabled={!value.trim()} />
+            <Button title={submitLabel} onPress={() => onSubmit(value.trim())} disabled={!value.trim()} />
           </View>
         </View>
       </View>

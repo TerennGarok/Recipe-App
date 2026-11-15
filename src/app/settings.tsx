@@ -4,11 +4,13 @@ import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 
 import { invalidateListCache } from '@/components/list-picker';
-import { BusyOverlay, Button, Card, Field, Icon, T } from '@/components/ui';
+import { BusyOverlay, Button, Card, Field, Icon, PromptModal, T } from '@/components/ui';
 import { Spacing, useTheme } from '@/constants/theme';
 import { signIn, signOut } from '@/lib/anylist/client';
 import { listRecipes } from '@/lib/db';
+import { formatUsd } from '@/lib/pricing';
 import { getAnthropicKey, setAnthropicKey, useAnyListSession } from '@/lib/settings';
+import { setBalance, useSpending } from '@/lib/spending';
 import { describeImport, importShareFile, shareRecipes } from '@/lib/share';
 
 export default function Settings() {
@@ -19,6 +21,8 @@ export default function Settings() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
+  const [balancePrompt, setBalancePrompt] = useState(false);
+  const spending = useSpending();
 
   useEffect(() => {
     getAnthropicKey().then(setSavedKey);
@@ -65,6 +69,38 @@ export default function Settings() {
           </View>
           {savedKey ? (
             <>
+              <View style={{ gap: 2 }}>
+                <T kind="small">Credit available</T>
+                {spending?.available != null ? (
+                  <T style={{ fontSize: 22, fontWeight: '700' }}>
+                    {formatUsd(spending.available)}
+                    <T kind="secondary">
+                      {'  '}({spending.avgPerRecipe != null ? `avg ${formatUsd(spending.avgPerRecipe)} per recipe` : 'no recipes cleaned up yet'})
+                    </T>
+                  </T>
+                ) : (
+                  <T kind="secondary">
+                    Not set{spending?.avgPerRecipe != null ? ` (avg ${formatUsd(spending.avgPerRecipe)} per recipe)` : ''}
+                  </T>
+                )}
+                <T kind="small">
+                  {spending?.available != null && spending.balanceSetAt
+                    ? `Estimated: the balance you entered on ${new Date(spending.balanceSetAt).toLocaleDateString()}, minus what this phone has spent since. Anthropic doesn't let apps read your balance, so update it when you add credit.`
+                    : 'Enter your balance from console.anthropic.com (Billing) and the app will count down as Claude is used on this phone.'}
+                </T>
+              </View>
+              <Button
+                title={spending?.available != null ? 'Update balance' : 'Enter balance'}
+                variant="secondary"
+                icon="wallet-outline"
+                onPress={() => setBalancePrompt(true)}
+              />
+              <Button
+                title="Check balance at console.anthropic.com"
+                variant="ghost"
+                icon="open-outline"
+                onPress={() => WebBrowser.openBrowserAsync('https://console.anthropic.com/settings/billing')}
+              />
               <T kind="secondary">API key saved: sk-ant-…{savedKey.slice(-4)}</T>
               <Button
                 title="Remove key"
@@ -151,6 +187,25 @@ export default function Settings() {
           <Button title="Import a recipe file" icon="download-outline" variant="secondary" onPress={importFile} />
         </Card>
       </ScrollView>
+      <PromptModal
+        visible={balancePrompt}
+        title="Claude credit balance"
+        message="Enter the remaining balance shown on console.anthropic.com under Billing."
+        placeholder="e.g. 20.00"
+        keyboardType="decimal-pad"
+        submitLabel="Save"
+        initialValue={spending?.available != null ? spending.available.toFixed(2) : ''}
+        onCancel={() => setBalancePrompt(false)}
+        onSubmit={(v) => {
+          const amount = parseFloat(v.replace(/[$,\s]/g, ''));
+          if (!Number.isFinite(amount) || amount < 0) {
+            Alert.alert('Enter an amount like 20.00');
+            return;
+          }
+          setBalancePrompt(false);
+          setBalance(amount);
+        }}
+      />
       <BusyOverlay message={busy} />
     </KeyboardAvoidingView>
   );

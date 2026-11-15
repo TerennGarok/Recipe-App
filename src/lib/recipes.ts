@@ -66,6 +66,17 @@ export async function removeMedia(recipeId: string, mediaId: string): Promise<vo
   await saveRecipe({ ...r, media: r.media.filter((x) => x.id !== mediaId) });
 }
 
+/** Swap a recipe photo for an edited (cropped/rotated) version of it. */
+export async function replaceMediaImage(recipeId: string, mediaId: string, newUri: string): Promise<void> {
+  const r = await getRecipe(recipeId);
+  const old = r?.media.find((x) => x.id === mediaId);
+  if (!r || !old) return;
+  // A new file name, so cached thumbnails of the old version aren't shown.
+  const fresh = await importLocalMedia(recipeId, newUri, 'image', 'image/jpeg');
+  deleteMediaFile(old);
+  await saveRecipe({ ...r, media: r.media.map((x) => (x.id === mediaId ? { ...x, localPath: fresh.localPath } : x)) });
+}
+
 export async function makeCover(recipeId: string, mediaId: string): Promise<void> {
   const r = await getRecipe(recipeId);
   if (!r) return;

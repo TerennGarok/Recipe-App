@@ -1,8 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, Switch, View } from 'react-native';
+import { Image } from 'expo-image';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
-import { BusyOverlay, Button, Card, Field, Icon, T } from '@/components/ui';
+import { ImageEditor } from '@/components/image-editor';
+import { BusyOverlay, Button, Card, Field, Icon, IconButton, T } from '@/components/ui';
 import { Spacing, useTheme } from '@/constants/theme';
 import { recipeFromPhotos, recipeFromText } from '@/lib/claude';
 import { pickFromLibrary, takeWithCamera } from '@/lib/pick';
@@ -10,13 +12,17 @@ import { createRecipe, draftFromUrl, type LocalAsset } from '@/lib/recipes';
 import type { RecipeDraft } from '@/lib/types';
 import { findUrl } from '@/lib/webpage';
 
-function ask(title: string, message: string, yes: string, no: string): Promise<boolean> {
-  return new Promise((resolve) =>
-    Alert.alert(title, message, [
-      { text: no, style: 'cancel', onPress: () => resolve(false) },
-      { text: yes, onPress: () => resolve(true) },
-    ]),
-  );
+type Page = LocalAsset & { id: string };
+
+let pageCounter = 0;
+const toPage = (a: LocalAsset): Page => ({ ...a, id: `page-${pageCounter++}` });
+
+function sharedImages(param: string | undefined): Page[] {
+  try {
+    return param ? (JSON.parse(param) as string[]).map((uri) => toPage({ uri, kind: 'image' })) : [];
+  } catch {
+    return [];
+  }
 }
 
 export default function AddRecipe() {
@@ -27,6 +33,10 @@ export default function AddRecipe() {
   const [keepPhotos, setKeepPhotos] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const started = useRef(false);
+  // Photos waiting to be read, so they can be reviewed, cropped and rotated first.
+  const [pages, setPages] = useState<Page[]>(() => sharedImages(params.images));
+  const [pageSource, setPageSource] = useState<'camera' | 'photos'>('photos');
+  const [editing, setEditing] = useState<Page | null>(null);
 
   async function run(label: string, makeDraft: () => Promise<RecipeDraft>, media: LocalAsset[] = []) {
     setBusy(label);
@@ -53,15 +63,20 @@ export default function AddRecipe() {
   }
 
   async function scan() {
-    const pages: LocalAsset[] = [];
-    for (;;) {
-      const shot = await takeWithCamera('photo');
-      if (!shot.length) break;
-      pages.push(...shot);
-      const more = await ask(`${pages.length} page${pages.length > 1 ? 's' : ''} captured`, 'Does the recipe continue on another page or the back of the card?', 'Add page', 'Done');
-      if (!more) break;
-    }
-    await fromPhotos(pages, 'camera');
+    const shot = await takeWithCamera('photo');
+    if (!shot.length) return;
+    const added = shot.map(toPage);
+    setPages((p) => [...p, ...added]);
+    setPageSource('camera');
+    // Offer crop & rotate right away for camera shots; Cancel keeps the photo as taken.
+    setEditing(added[0]);
+  }
+
+  async function choose() {
+    const picked = await pickFromLibrary('photos');
+    if (!picked.length) return;
+    setPages((p) => [...p, ...picked.map(toPage)]);
+    if (!pages.length) setPageSource('photos');
   }
 
   function fromUrl(u = url) {
@@ -75,24 +90,17 @@ export default function AddRecipe() {
     return run('Claude is cleaning up the recipe…', () => recipeFromText(text));
   }
 
-  // Shared into the app from another app: start right away.
+  // A link shared into the app from a browser: start importing right away.
+  // (Shared photos wait in the review strip so they can be cropped first.)
   useEffect(() => {
-    if (started.current) return;
-    let uris: string[] | null = null;
-    try {
-      uris = params.images ? (JSON.parse(params.images) as string[]) : null;
-    } catch {}
     const sharedUrl = params.url;
-    if (!uris?.length && !sharedUrl) return;
+    if (started.current || !sharedUrl) return;
     started.current = true;
     // Start after this render so the screen is visible behind the progress overlay.
-    const timer = setTimeout(() => {
-      if (uris?.length) fromPhotos(uris.map((uri) => ({ uri, kind: 'image' as const })), 'photos');
-      else if (sharedUrl) fromUrl(sharedUrl);
-    }, 0);
+    const timer = setTimeout(() => fromUrl(sharedUrl), 0);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.images, params.url]);
+  }, [params.url]);
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -102,9 +110,35 @@ export default function AddRecipe() {
             <Icon name="camera" color={t.primary} />
             <T kind="heading">Paper recipe</T>
           </View>
-          <T kind="secondary">Photograph a recipe card or cookbook page. Claude reads handwriting, fixes typos and formats it.</T>
-          <Button title="Scan with camera" icon="camera-outline" onPress={scan} />
-          <Button title="Choose photos" icon="images-outline" variant="secondary" onPress={async () => fromPhotos(await pickFromLibrary('photos'), 'photos')} />
+          <T kind="secondary">Photograph a recipe card or cookbook page. Claude reads handwriting, applies handwritten changes, fixes typos and formats it.</T>
+          {pages.length ? (
+            <>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: Spacing.sm }}>
+                {pages.map((p, i) => (
+                  <View key={p.id} style={{ gap: Spacing.xs, alignItems: 'center' }}>
+                    <Pressable onPress={() => setEditing(p)} accessibilityLabel={`Crop or rotate page ${i + 1}`}>
+                      <Image source={{ uri: p.uri }} style={[styles.thumb, { backgroundColor: t.chip }]} contentFit="cover" />
+                    </Pressable>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <IconButton name="crop" label={`Crop or rotate page ${i + 1}`} color={t.primary} onPress={() => setEditing(p)} />
+                      <IconButton name="trash-outline" label={`Remove page ${i + 1}`} color={t.textSecondary} onPress={() => setPages((ps) => ps.filter((x) => x.id !== p.id))} />
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+              <T kind="small">Tap a photo to crop or rotate it. Add more pages if the recipe continues on the back or another page.</T>
+              <Button title={`Read ${pages.length > 1 ? `${pages.length} pages` : 'recipe'} with Claude`} icon="sparkles-outline" onPress={() => fromPhotos(pages, pageSource)} />
+              <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                <Button title="Add page" icon="camera-outline" variant="secondary" onPress={scan} style={{ flex: 1 }} />
+                <Button title="From photos" icon="images-outline" variant="secondary" onPress={choose} style={{ flex: 1 }} />
+              </View>
+            </>
+          ) : (
+            <>
+              <Button title="Scan with camera" icon="camera-outline" onPress={scan} />
+              <Button title="Choose photos" icon="images-outline" variant="secondary" onPress={choose} />
+            </>
+          )}
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <T kind="secondary">Keep the original photos with the recipe</T>
             <Switch value={keepPhotos} onValueChange={setKeepPhotos} trackColor={{ true: t.primary }} />
@@ -141,7 +175,21 @@ export default function AddRecipe() {
 
         <Button title="Type it in myself" variant="ghost" icon="create-outline" onPress={() => router.replace('/edit/new')} />
       </ScrollView>
+      <ImageEditor
+        uri={editing?.uri ?? null}
+        cancelLabel={pages.length && editing?.id === pages[pages.length - 1].id && pageSource === 'camera' ? 'Skip' : 'Cancel'}
+        onCancel={() => setEditing(null)}
+        onDone={(uri) => {
+          const page = editing;
+          setEditing(null);
+          if (page) setPages((ps) => ps.map((x) => (x.id === page.id ? { ...x, uri, mimeType: 'image/jpeg', fileName: null } : x)));
+        }}
+      />
       <BusyOverlay message={busy} />
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  thumb: { width: 96, height: 128, borderRadius: 10 },
+});

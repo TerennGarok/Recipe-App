@@ -4,15 +4,18 @@ import { useState } from 'react';
 import { ActionSheetIOS, ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ImageEditor } from '@/components/image-editor';
+import { LineEditor, type LineEdit } from '@/components/line-editor';
 import { ListPickerSheet } from '@/components/list-picker';
 import { MediaGallery } from '@/components/media-gallery';
 import { BusyOverlay, Button, Chip, Icon, IconButton, PromptModal, T } from '@/components/ui';
 import { Radius, Spacing, useTheme } from '@/constants/theme';
 import type { ShoppingItemInput } from '@/lib/anylist/client';
-import { useRecipe } from '@/lib/db';
-import { groupBySection } from '@/lib/ingredients';
+import { saveRecipe, useRecipe } from '@/lib/db';
+import { groupBySection, parseIngredientLine } from '@/lib/ingredients';
 import { pickFromLibrary, takeWithCamera } from '@/lib/pick';
-import { addMedia, deleteRecipe, guessMediaKind, makeCover, removeMedia, toggleFavorite } from '@/lib/recipes';
+import { mediaUri } from '@/lib/media';
+import { addMedia, deleteRecipe, guessMediaKind, makeCover, removeMedia, replaceMediaImage, toggleFavorite, type LocalAsset } from '@/lib/recipes';
 import { shareRecipes } from '@/lib/share';
 import type { Ingredient, Media, Recipe } from '@/lib/types';
 
@@ -62,6 +65,9 @@ export default function RecipeScreen() {
   const [busy, setBusy] = useState<string | null>(null);
   const [pendingIds, setPendingIds] = useState<string[]>([]);
   const [linkPrompt, setLinkPrompt] = useState(false);
+  const [lineEdit, setLineEdit] = useState<LineEdit | null>(null);
+  const [cropping, setCropping] = useState<Media | null>(null);
+  const [newPhoto, setNewPhoto] = useState<LocalAsset | null>(null);
 
   if (recipe === undefined) {
     return (
@@ -95,16 +101,23 @@ export default function RecipeScreen() {
     }
   }
 
+  /** A single new photo opens in the crop & rotate editor first; videos and batches are saved as-is. */
+  function addPicked(assets: LocalAsset[]) {
+    if (assets.length === 1 && assets[0].kind === 'image') setNewPhoto(assets[0]);
+    else if (assets.length) withBusy('Saving…', () => addMedia(r.id, assets));
+  }
+
   function addMediaMenu() {
     chooseAction('Add photo or video', [
-      { label: 'Take photo or video', onPress: async () => { const a = await takeWithCamera('photo-or-video'); if (a.length) withBusy('Saving…', () => addMedia(r.id, a)); } },
-      { label: 'Choose from library', onPress: async () => { const a = await pickFromLibrary('photos-and-videos'); if (a.length) withBusy('Saving…', () => addMedia(r.id, a)); } },
+      { label: 'Take photo or video', onPress: async () => addPicked(await takeWithCamera('photo-or-video')) },
+      { label: 'Choose from library', onPress: async () => addPicked(await pickFromLibrary('photos-and-videos')) },
       { label: 'From a web link', onPress: () => setLinkPrompt(true) },
     ]);
   }
 
   function mediaMenu(m: Media) {
     chooseAction(m.kind === 'image' ? 'Photo' : 'Video', [
+      ...(m.kind === 'image' && m.localPath ? [{ label: 'Crop & rotate', onPress: () => setCropping(m) }] : []),
       ...(m.kind === 'image' ? [{ label: 'Use as cover photo', onPress: () => makeCover(r.id, m.id) }] : []),
       ...(m.remoteUrl ? [{ label: 'Open original link', onPress: () => WebBrowser.openBrowserAsync(m.remoteUrl!) }] : []),
       { label: 'Remove', destructive: true, onPress: () => removeMedia(r.id, m.id) },
@@ -190,7 +203,7 @@ export default function RecipeScreen() {
               }}
             />
           </View>
-          <T kind="small">{shopMode ? 'Tap the ingredients you need to buy.' : 'Tap an ingredient to add it to an AnyList list.'}</T>
+          <T kind="small">{shopMode ? 'Tap the ingredients you need to buy.' : 'Tap an ingredient to add it to an AnyList list. Press and hold to edit.'}</T>
           {groupBySection(r.ingredients).map((g, gi) => (
             <View key={gi} style={{ gap: 2 }}>
               {g.section ? <T style={{ fontWeight: '700', marginTop: Spacing.sm }}>{g.section}</T> : null}
@@ -201,6 +214,8 @@ export default function RecipeScreen() {
                   <Pressable
                     key={ing.id}
                     onPress={() => (shopMode ? toggle(selected, setSelected, ing.id) : openPicker([ing]))}
+                    onLongPress={() => setLineEdit({ kind: 'ingredient', id: ing.id, text: ing.text, label: 'Edit ingredient' })}
+                    delayLongPress={400}
                     style={({ pressed }) => [styles.ingredient, { borderColor: t.border, backgroundColor: pressed || isSel ? t.chip : 'transparent' }]}>
                     <Icon
                       name={shopMode ? (isSel ? 'checkbox' : 'square-outline') : isAdded ? 'checkmark-circle' : 'add-circle-outline'}
@@ -224,7 +239,12 @@ export default function RecipeScreen() {
                 const n = r.steps.indexOf(s) + 1;
                 const done = doneSteps.has(s.id);
                 return (
-                  <Pressable key={s.id} onPress={() => toggle(doneSteps, setDoneSteps, s.id)} style={styles.step}>
+                  <Pressable
+                    key={s.id}
+                    onPress={() => toggle(doneSteps, setDoneSteps, s.id)}
+                    onLongPress={() => setLineEdit({ kind: 'step', id: s.id, text: s.text, label: `Edit step ${n}` })}
+                    delayLongPress={400}
+                    style={styles.step}>
                     <View style={[styles.stepNum, { backgroundColor: done ? t.accent : t.primary }]}>
                       {done ? <Icon name="checkmark" size={16} color={t.primaryText} /> : <T style={{ color: t.primaryText, fontWeight: '700' }}>{n}</T>}
                     </View>
@@ -262,6 +282,49 @@ export default function RecipeScreen() {
           setAdded(new Set([...added, ...pendingIds]));
           setShopMode(false);
           setSelected(new Set());
+        }}
+      />
+      <ImageEditor
+        uri={cropping ? mediaUri(cropping) : null}
+        onCancel={() => setCropping(null)}
+        onDone={(uri) => {
+          const m = cropping;
+          setCropping(null);
+          if (m && uri !== mediaUri(m)) withBusy('Saving…', () => replaceMediaImage(r.id, m.id, uri));
+        }}
+      />
+      <ImageEditor
+        uri={newPhoto?.uri ?? null}
+        cancelLabel="Skip"
+        onCancel={() => {
+          // Cancel still keeps the photo, just unedited.
+          const a = newPhoto;
+          setNewPhoto(null);
+          if (a) withBusy('Saving…', () => addMedia(r.id, [a]));
+        }}
+        onDone={(uri) => {
+          const a = newPhoto;
+          setNewPhoto(null);
+          if (a) withBusy('Saving…', () => addMedia(r.id, [uri === a.uri ? a : { uri, kind: 'image', mimeType: 'image/jpeg' }]));
+        }}
+      />
+      <LineEditor
+        edit={lineEdit}
+        onClose={() => setLineEdit(null)}
+        onSave={(e, text) => {
+          setLineEdit(null);
+          if (text === e.text) return;
+          if (e.kind === 'ingredient') {
+            const { item, quantity } = parseIngredientLine(text);
+            saveRecipe({ ...r, ingredients: r.ingredients.map((i) => (i.id === e.id ? { ...i, text, item, quantity } : i)) });
+          } else {
+            saveRecipe({ ...r, steps: r.steps.map((st) => (st.id === e.id ? { ...st, text } : st)) });
+          }
+        }}
+        onDelete={(e) => {
+          setLineEdit(null);
+          if (e.kind === 'ingredient') saveRecipe({ ...r, ingredients: r.ingredients.filter((i) => i.id !== e.id) });
+          else saveRecipe({ ...r, steps: r.steps.filter((st) => st.id !== e.id) });
         }}
       />
       <PromptModal

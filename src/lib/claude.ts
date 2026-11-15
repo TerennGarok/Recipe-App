@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { imageForClaude } from './media';
 import { getAnthropicKey } from './settings';
+import { Meter } from './spending';
 import type { RecipeDraft, RecipeSourceType } from './types';
 import { jsonLdIsComplete, type PageInfo } from './webpage';
 
@@ -72,7 +73,8 @@ const EXTRACT_SYSTEM = `You turn recipes from any source (photos of handwritten 
 - Write ingredient lines in a consistent style ("1 cup flour", "2 Tbsp butter, softened"). Expand cryptic abbreviations a cook might misread ("T." to "Tbsp", "t." to "tsp", "c." to "cup").
 - Split instructions into clear, numbered-style steps (without the numbers), one action group per step. Keep oven temperatures and times.
 - Keep section groupings the source uses (e.g. "Crust", "Filling").
-- Put personal touches (e.g. "Mom's note: use less sugar") in notes rather than discarding them.
+- Handwritten annotations on a printed or typed recipe (crossed-out amounts with new ones written in, margin notes like "use ¾ cup sugar", "+1 tsp cinnamon", "bake 10 min longer", added or removed ingredients) are the cook's own corrections: apply them directly to the ingredients and steps, so the recipe reads the way it is actually made. Then add one line per applied change to notes, e.g. "Handwritten change: sugar reduced from 1 cup to ¾ cup".
+- Handwritten remarks that aren't changes to the recipe (e.g. "Dad's favorite", "made for Easter 2019", serving suggestions) go in notes rather than being discarded.
 - For web pages, ignore ads, life stories, comments, and navigation; extract only the recipe.
 - If there are several recipes, extract the main one and mention the others in notes.
 - If there is no recipe, set isRecipe to false and fill the other fields minimally.`;
@@ -83,6 +85,8 @@ async function runExtraction(
 ): Promise<ExtractedRecipeData> {
   const c = await client();
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content }];
+  const meter = new Meter('recipe');
+  let ok = false;
   try {
     // Server tools (web fetch) can pause a long turn; send it back to let it continue.
     for (let i = 0; i < 5; i++) {
@@ -95,6 +99,7 @@ async function runExtraction(
         ...(tools ? { tools } : {}),
         messages,
       });
+      meter.add(res.model, res.usage);
       if (res.stop_reason === 'pause_turn') {
         messages.push({ role: 'assistant', content: res.content });
         continue;
@@ -103,11 +108,14 @@ async function runExtraction(
       if (res.stop_reason === 'max_tokens') throw new ClaudeError('This recipe was too long to process in one go.');
       if (!res.parsed_output) throw new ClaudeError('Claude returned an unreadable result. Please try again.');
       if (!res.parsed_output.isRecipe) throw new ClaudeError("Claude couldn't find a recipe in that.");
+      ok = true;
       return res.parsed_output;
     }
     throw new ClaudeError('Claude took too long. Please try again.');
   } catch (e) {
     throw friendlyError(e);
+  } finally {
+    await meter.save(ok).catch(() => {});
   }
 }
 
@@ -141,8 +149,8 @@ export async function recipeFromPhotos(uris: string[], type: 'camera' | 'photos'
       type: 'text',
       text:
         images.length > 1
-          ? `These ${images.length} photos are pages/sides of one recipe, in order. Extract the recipe.`
-          : 'This photo shows a recipe. Extract it.',
+          ? `These ${images.length} photos are pages/sides of one recipe, in order. Extract the recipe, applying any handwritten changes.`
+          : 'This photo shows a recipe. Extract it, applying any handwritten changes.',
     },
   ];
   return toDraft(await runExtraction(content), type, null, null);
@@ -240,6 +248,8 @@ export async function searchRecipes(query: string): Promise<SearchResult[]> {
   const c = await client();
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: `Find recipes for: ${query}` }];
   let nudged = false;
+  const meter = new Meter('search');
+  let ok = false;
   try {
     for (let i = 0; i < 8; i++) {
       const res = await c.beta.messages.create({
@@ -251,11 +261,13 @@ export async function searchRecipes(query: string): Promise<SearchResult[]> {
         tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 6 }, PRESENT_TOOL],
         messages,
       });
+      meter.add(res.model, res.usage);
       if (res.stop_reason === 'refusal') throw new ClaudeError('Claude declined this search.');
       const call = res.content.find((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === 'tool_use' && b.name === 'present_recipes');
       if (call) {
         const parsed = SearchResults.safeParse(call.input);
         if (!parsed.success) throw new ClaudeError('Claude returned results in an unexpected format. Please try again.');
+        ok = true;
         return parsed.data.results.filter((r) => /^https?:\/\//.test(r.url));
       }
       messages.push({ role: 'assistant', content: res.content });
@@ -267,5 +279,7 @@ export async function searchRecipes(query: string): Promise<SearchResult[]> {
     throw new ClaudeError('Claude did not return any results. Try a different search.');
   } catch (e) {
     throw friendlyError(e);
+  } finally {
+    await meter.save(ok).catch(() => {});
   }
 }

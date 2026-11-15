@@ -1,29 +1,30 @@
 import { useColorScheme } from 'react-native';
 
+// Blue palette matching the app icon (scripts/make-icons.mjs). Swap in brand colors here.
 export const Colors = {
   light: {
-    text: '#2B2118',
-    textSecondary: '#6F6257',
-    background: '#FBF7F2',
+    text: '#14213D',
+    textSecondary: '#5A6B85',
+    background: '#F5F8FC',
     card: '#FFFFFF',
-    border: '#E8DFD5',
-    primary: '#B5532B',
+    border: '#D6E0EC',
+    primary: '#1F4E8C',
     primaryText: '#FFFFFF',
     accent: '#2F7D5B',
     danger: '#B3261E',
-    chip: '#F1E7DC',
+    chip: '#E6EEF8',
   },
   dark: {
-    text: '#F3ECE4',
-    textSecondary: '#B4A89C',
-    background: '#16120F',
-    card: '#221C17',
-    border: '#3A3129',
-    primary: '#E07A4C',
-    primaryText: '#1A120C',
+    text: '#EAF1FA',
+    textSecondary: '#A3B3C9',
+    background: '#0E1622',
+    card: '#172231',
+    border: '#2A3A50',
+    primary: '#8FB8F0',
+    primaryText: '#0E1622',
     accent: '#5CC293',
     danger: '#F2B8B5',
-    chip: '#2E261F',
+    chip: '#1E2D42',
   },
 } as const;
 
