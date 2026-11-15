@@ -1,7 +1,7 @@
 import { fetch } from 'expo/fetch';
 
 import { recipeFromPage, recipeFromUrlViaClaude } from './claude';
-import { deleteRecipeRow, getRecipe, saveRecipe } from './db';
+import { deleteRecipeRow, getDb, getRecipe, saveRecipe } from './db';
 import { newId } from './id';
 import { deleteMediaFile, deleteRecipeMedia, importLocalMedia, importRemoteMedia } from './media';
 import type { Media, MediaKind, Recipe, RecipeDraft } from './types';
@@ -87,6 +87,8 @@ export async function makeCover(recipeId: string, mediaId: string): Promise<void
 
 export async function deleteRecipe(id: string): Promise<void> {
   deleteRecipeMedia(id);
+  // Keep planned meals as plain text rather than linking to a recipe that's gone.
+  await getDb().runAsync('UPDATE meal_plan SET recipe_id = NULL WHERE recipe_id = ?', [id]);
   await deleteRecipeRow(id);
 }
 

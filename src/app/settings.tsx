@@ -11,6 +11,7 @@ import { listRecipes } from '@/lib/db';
 import { formatUsd } from '@/lib/pricing';
 import { getAnthropicKey, setAnthropicKey, useAnyListSession } from '@/lib/settings';
 import { setBalance, useSpending } from '@/lib/spending';
+import { exactAlarmsAllowed, requestExactAlarms } from '@/lib/timers';
 import { describeImport, importShareFile, shareRecipes } from '@/lib/share';
 
 export default function Settings() {
@@ -23,9 +24,11 @@ export default function Settings() {
   const [busy, setBusy] = useState<string | null>(null);
   const [balancePrompt, setBalancePrompt] = useState(false);
   const spending = useSpending();
+  const [exactAlarms, setExactAlarms] = useState<boolean | null>(null);
 
   useEffect(() => {
     getAnthropicKey().then(setSavedKey);
+    exactAlarmsAllowed().then(setExactAlarms).catch(() => setExactAlarms(true));
   }, []);
 
   async function run(label: string, fn: () => Promise<void>) {
@@ -162,6 +165,19 @@ export default function Settings() {
             </>
           )}
         </Card>
+
+        {exactAlarms === false ? (
+          <Card style={{ gap: Spacing.md }}>
+            <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
+              <Icon name="alarm" color={t.primary} />
+              <T kind="heading">Timer alarms</T>
+            </View>
+            <T kind="secondary">
+              Allow precise alarms so recipe timers go off exactly on time while RecipeBox is in the background. Without it, Android may delay a timer by a minute or more to save battery.
+            </T>
+            <Button title="Allow precise alarms" icon="alarm-outline" variant="secondary" onPress={() => requestExactAlarms().then(setExactAlarms).catch(() => {})} />
+          </Card>
+        ) : null}
 
         <Card style={{ gap: Spacing.md }}>
           <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
