@@ -7,16 +7,19 @@
     "icon": "./assets/images/icon.png",
     "scheme": "recipebox",
     "userInterfaceStyle": "automatic",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.terenngarok.recipebox",
       "supportsTablet": true
     },
     "android": {
       "package": "com.terenngarok.recipebox",
       "adaptiveIcon": {
-        "backgroundColor": "#FBF7F2",
+        "backgroundColor": "#1F4E8C",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -35,8 +38,19 @@
           "microphonePermission": "RecipeBox records sound when you film a video of a dish."
         }
       ],
-      ["expo-secure-store", { "faceIDPermission": false, "configureAndroidBackup": true }],
-      ["expo-video", { "supportsPictureInPicture": true }],
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false,
+          "configureAndroidBackup": true
+        }
+      ],
+      [
+        "expo-video",
+        {
+          "supportsPictureInPicture": true
+        }
+      ],
       [
         "expo-sharing",
         {
@@ -52,23 +66,36 @@
           },
           "android": {
             "enabled": true,
-            "singleShareMimeTypes": ["text/plain", "image/*", "application/json", "application/octet-stream"],
-            "multipleShareMimeTypes": ["image/*"]
+            "singleShareMimeTypes": [
+              "text/plain",
+              "image/*",
+              "application/json",
+              "application/octet-stream"
+            ],
+            "multipleShareMimeTypes": [
+              "image/*"
+            ]
           }
         }
       ],
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FBF7F2",
+          "backgroundColor": "#1F4E8C",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 200
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "owner": "terenn",
+    "extra": {
+      "eas": {
+        "projectId": "433ce297-9d89-45aa-919f-a6b28ec10adc"
+      }
     }
   }
 }

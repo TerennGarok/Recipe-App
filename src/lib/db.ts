@@ -5,7 +5,7 @@ import type { Recipe } from './types';
 
 let db: SQLiteDatabase | null = null;
 
-function getDb(): SQLiteDatabase {
+export function getDb(): SQLiteDatabase {
   if (!db) {
     db = openDatabaseSync('recipebox.db');
     db.execSync(`
@@ -20,6 +20,14 @@ function getDb(): SQLiteDatabase {
         updated_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS recipes_updated ON recipes(updated_at DESC);
+      CREATE TABLE IF NOT EXISTS claude_usage (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        at INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        cost REAL NOT NULL,
+        ok INTEGER NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS app_kv (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
     `);
   }
   return db;
@@ -28,7 +36,7 @@ function getDb(): SQLiteDatabase {
 // --- tiny change-notification so screens refresh after edits ---
 let version = 0;
 const listeners = new Set<() => void>();
-function notify() {
+export function notify() {
   version++;
   listeners.forEach((l) => l());
 }

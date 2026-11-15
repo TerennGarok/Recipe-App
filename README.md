@@ -6,14 +6,15 @@ A personal, on-device recipe box for iPhone and Android. Claude reads, cleans up
 
 | | |
 |---|---|
-| **Scan paper recipes** | Photograph a recipe card or cookbook page (multiple pages or the back of a card are fine). Claude reads handwriting, fixes typos, standardizes formatting and keeps notes like "Mom: use less sugar". The original photos can stay attached. |
+| **Scan paper recipes** | Photograph a recipe card or cookbook page (multiple pages or the back of a card are fine), and crop or rotate each photo before Claude reads it. Claude reads handwriting, applies handwritten changes (a crossed-out amount with a new one written in) to the recipe itself and lists them in the notes, fixes typos and standardizes formatting. The original photos can stay attached. |
 | **Import from websites** | Paste a link, or in Safari/Chrome tap **Share → RecipeBox**. The app pulls the recipe out of the page (skipping the ads and the life story) along with the main photo and any video. |
 | **Paste text** | Recipes from emails, texts or notes get cleaned up into the same format. |
 | **Find recipes online** | Ask for "weeknight chicken thighs" and Claude searches the web, favoring well-reviewed recipes from reputable sources. Preview a result, then save the ones you like. |
 | **AnyList** | Tap any ingredient and pick which AnyList list it goes to (your last-used list is on top, and it tells you if the item is already on the list). Or tap **Shop**, select everything you're missing, and add them all at once. |
-| **Photos & videos** | Add photos or videos of the dish from the camera, your library or a web link (image, video file, or YouTube/Vimeo/TikTok page). Long-press one to make it the cover or remove it. |
+| **Photos & videos** | Add photos or videos of the dish from the camera, your library or a web link (image, video file, or YouTube/Vimeo/TikTok page). Long-press one to crop/rotate it, make it the cover, or remove it. |
 | **Family sharing** | Share one recipe or your whole collection as a `.recipebox.json` file over Messages, AirDrop or email. Family members open it in RecipeBox to import it. If someone re-shares an updated recipe, it replaces the older copy, unless you've edited yours more recently. |
-| **Everything else** | Search by title, ingredient or tag. Favorites. Tap steps to check them off while cooking. Edit anything, with an optional "Tidy up with Claude" pass. Works in dark mode. |
+| **Claude spending** | Settings shows your estimated remaining Anthropic credit and the average cost per recipe cleanup. Anthropic doesn't let apps read the balance, so you enter it once (and again when you top up) and the app subtracts the cost of each request. |
+| **Everything else** | Search by title, ingredient or tag. Favorites. Tap steps to check them off while cooking; press and hold an ingredient or step to edit or delete it. Edit anything, with an optional "Tidy up with Claude" pass. Works in dark mode. |
 
 Recipes, photos and videos are stored **only on the device**: there's no server and no account. Your Anthropic API key and AnyList login are kept in the iOS Keychain / Android Keystore.
 
@@ -42,6 +43,9 @@ npx eas-cli@latest build --profile preview --platform ios       # ad-hoc build f
 For day-to-day development: `npx eas-cli build --profile development`, install that build once, then `npm start` and changes load live.
 
 ## Development
+
+The app icon is generated from SVG by `scripts/make-icons.mjs` (needs Playwright); change the colors at the top and run `node scripts/make-icons.mjs`.
+
 
 ```bash
 npm test          # unit tests (AnyList protocol, page parsing, ingredient parsing, share files, Claude requests)

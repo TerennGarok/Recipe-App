@@ -18,6 +18,19 @@ vi.mock('expo/fetch', () => ({
   },
 }));
 vi.mock('../src/lib/settings', () => ({ getAnthropicKey: async () => 'sk-ant-test' }));
+const saved: { kind: string; ok: boolean; models: string[] }[] = [];
+vi.mock('../src/lib/spending', () => ({
+  Meter: class {
+    models: string[] = [];
+    constructor(private kind: string) {}
+    add(model: string) {
+      this.models.push(model);
+    }
+    async save(ok: boolean) {
+      saved.push({ kind: this.kind, ok, models: this.models });
+    }
+  },
+}));
 vi.mock('../src/lib/media', () => ({ imageForClaude: async () => ({ base64: 'AAAA', mediaType: 'image/jpeg' }) }));
 
 const { recipeFromText, recipeFromPage, searchRecipes, ClaudeError } = await import('../src/lib/claude');
@@ -50,6 +63,7 @@ const recipeJson = {
 
 beforeEach(() => {
   calls.length = 0;
+  saved.length = 0;
   replies = [];
 });
 
@@ -73,11 +87,13 @@ describe('recipe extraction', () => {
     expect(schema.additionalProperties).toBe(false);
     expect(schema.required).toEqual(expect.arrayContaining(['title', 'ingredients', 'steps', 'isRecipe']));
     expect(body.thinking).toBeUndefined();
+    expect(saved).toEqual([{ kind: 'recipe', ok: true, models: ['claude-opus-5-5'] }]);
   });
 
   it('reports when there is no recipe', async () => {
     replies = [message([{ type: 'text', text: JSON.stringify({ ...recipeJson, isRecipe: false }) }])];
     await expect(recipeFromText('hello')).rejects.toThrow(/couldn't find a recipe/);
+    expect(saved).toEqual([{ kind: 'recipe', ok: false, models: ['claude-opus-5-5'] }]);
   });
 
   it('surfaces refusals as a friendly error', async () => {
@@ -120,6 +136,7 @@ describe('online search', () => {
     const found = await searchRecipes('chili');
     expect(found.map((r) => r.title)).toEqual(['Chili']);
     expect(calls).toHaveLength(2);
+    expect(saved).toEqual([{ kind: 'search', ok: true, models: ['claude-opus-5-5', 'claude-opus-5-5'] }]);
     const tools = calls[0].body.tools;
     expect(tools[0]).toMatchObject({ type: 'web_search_20260209', name: 'web_search' });
     expect(tools[1]).toMatchObject({ name: 'present_recipes', strict: true });

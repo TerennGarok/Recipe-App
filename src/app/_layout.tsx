@@ -1,41 +1,26 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, router } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname } from 'expo-router';
 import { useIncomingShare } from 'expo-sharing';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Alert, useColorScheme } from 'react-native';
+import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
-import { describeImport, importShareFile } from '@/lib/share';
-import { findUrl } from '@/lib/webpage';
+import { handleSharedPayloads } from '@/lib/incoming';
 
-/** Handles things shared *into* the app from the share sheet: links, text, photos, recipe files. */
+/**
+ * Handles items shared while the app is already open. (When the app is closed, the system
+ * opens it at /expo-sharing instead, and that screen does the same job.)
+ */
 function IncomingShareHandler() {
+  const pathname = usePathname();
   const { resolvedSharedPayloads, clearSharedPayloads, isResolving } = useIncomingShare();
 
   useEffect(() => {
-    if (isResolving || resolvedSharedPayloads.length === 0) return;
+    if (pathname === '/expo-sharing' || isResolving || resolvedSharedPayloads.length === 0) return;
     const payloads = resolvedSharedPayloads;
     clearSharedPayloads();
-
-    const recipeFile = payloads.find(
-      (p) => p.contentUri && (p.originalName?.endsWith('.json') || p.contentMimeType === 'application/json' || p.contentUri.endsWith('.json')),
-    );
-    if (recipeFile?.contentUri) {
-      importShareFile(recipeFile.contentUri)
-        .then((s) => Alert.alert('Recipes imported', describeImport(s)))
-        .catch((e: Error) => Alert.alert('Could not import', e.message));
-      return;
-    }
-    const images = payloads.filter((p) => p.contentType === 'image' && p.contentUri).map((p) => p.contentUri!);
-    if (images.length) {
-      router.push({ pathname: '/add', params: { images: JSON.stringify(images) } });
-      return;
-    }
-    const text = payloads.map((p) => (p.contentType === 'website' ? p.contentUri ?? p.value : p.value)).join('\n').trim();
-    const url = findUrl(text);
-    if (url && text.length < url.length + 200) router.push({ pathname: '/add', params: { url } });
-    else if (text) router.push({ pathname: '/add', params: { text } });
-  }, [resolvedSharedPayloads, isResolving, clearSharedPayloads]);
+    handleSharedPayloads(payloads);
+  }, [pathname, resolvedSharedPayloads, isResolving, clearSharedPayloads]);
 
   return null;
 }
@@ -59,6 +44,7 @@ export default function RootLayout() {
         <Stack.Screen name="recipe/[id]" options={{ title: '' }} />
         <Stack.Screen name="edit/[id]" options={{ title: 'Edit recipe', presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="expo-sharing" options={{ headerShown: false, animation: 'none' }} />
       </Stack>
     </ThemeProvider>
   );
