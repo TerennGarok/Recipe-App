@@ -79,6 +79,25 @@ const EXTRACT_SYSTEM = `You turn recipes from any source (photos of handwritten 
 - If there are several recipes, extract the main one and mention the others in notes.
 - If there is no recipe, set isRecipe to false and fill the other fields minimally.`;
 
+/**
+ * Read a structured-output response. We parse it ourselves (instead of messages.parse) so that a
+ * cut-off or declined response is reported by its stop reason, and its cost is still recorded.
+ */
+function readStructured<T>(res: Anthropic.Beta.BetaMessage, schema: z.ZodType<T>, tooLong: string): T {
+  if (res.stop_reason === 'refusal') throw new ClaudeError('Claude declined to process this content.');
+  if (res.stop_reason === 'max_tokens') throw new ClaudeError(tooLong);
+  const text = res.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new ClaudeError('Claude returned an unreadable result. Please try again.');
+  }
+  const parsed = schema.safeParse(json);
+  if (!parsed.success) throw new ClaudeError('Claude returned an unreadable result. Please try again.');
+  return parsed.data;
+}
+
 async function runExtraction(
   content: Anthropic.Beta.BetaContentBlockParam[],
   tools?: Anthropic.Beta.BetaToolUnion[],
@@ -90,7 +109,7 @@ async function runExtraction(
   try {
     // Server tools (web fetch) can pause a long turn; send it back to let it continue.
     for (let i = 0; i < 5; i++) {
-      const res = await c.beta.messages.parse({
+      const res = await c.beta.messages.create({
         model: MODEL,
         max_tokens: 16000,
         ...FALLBACK,
@@ -104,12 +123,10 @@ async function runExtraction(
         messages.push({ role: 'assistant', content: res.content });
         continue;
       }
-      if (res.stop_reason === 'refusal') throw new ClaudeError('Claude declined to process this content.');
-      if (res.stop_reason === 'max_tokens') throw new ClaudeError('This recipe was too long to process in one go.');
-      if (!res.parsed_output) throw new ClaudeError('Claude returned an unreadable result. Please try again.');
-      if (!res.parsed_output.isRecipe) throw new ClaudeError("Claude couldn't find a recipe in that.");
+      const recipe = readStructured(res, ExtractedRecipe, 'This recipe was too long to process in one go.');
+      if (!recipe.isRecipe) throw new ClaudeError("Claude couldn't find a recipe in that.");
       ok = true;
-      return res.parsed_output;
+      return recipe;
     }
     throw new ClaudeError('Claude took too long. Please try again.');
   } catch (e) {
@@ -178,6 +195,60 @@ export async function recipeFromPage(page: PageInfo): Promise<RecipeDraft> {
     ...page.videos.slice(0, 1).map((url) => ({ kind: 'video' as const, url })),
   ];
   return draft;
+}
+
+const PdfRecipes = z.object({
+  recipes: z.array(ExtractedRecipe).describe('Every complete recipe in the document, in the order they appear.'),
+});
+
+/** PDFs of up to ~30 MB / 100 pages; a 1M-context model handles far more, but the request size limit is 32 MB. */
+export const MAX_PDF_BYTES = 30 * 1024 * 1024;
+
+/**
+ * A PDF can hold one recipe (a printout) or many (a cookbook chapter, a family collection).
+ * Every recipe in it becomes its own draft.
+ */
+export async function recipesFromPdf(base64: string, fileName: string): Promise<RecipeDraft[]> {
+  const c = await client();
+  const meter = new Meter('recipe');
+  let found = 0;
+  try {
+    const res = await c.beta.messages.create(
+      {
+        model: MODEL,
+        // Room for many recipes; a non-streaming request is fine because we set our own timeout.
+        max_tokens: 32000,
+        ...FALLBACK,
+        system: EXTRACT_SYSTEM,
+        output_config: { effort: 'medium', format: betaZodOutputFormat(PdfRecipes) },
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 }, title: fileName },
+              {
+                type: 'text',
+                text: 'This PDF may contain one recipe or several. Extract every complete recipe, each as its own entry, applying any handwritten changes. Skip tables of contents, indexes, ads and partial fragments.',
+              },
+            ],
+          },
+        ],
+      },
+      { timeout: 15 * 60 * 1000 },
+    );
+    meter.add(res.model, res.usage);
+    const recipes = readStructured(res, PdfRecipes, 'This PDF has too many recipes to read at once. Split it into smaller PDFs and try again.').recipes.filter(
+      (r) => r.isRecipe,
+    );
+    if (!recipes.length) throw new ClaudeError("Claude couldn't find a recipe in this PDF.");
+    found = recipes.length;
+    const name = fileName.replace(/\.pdf$/i, '');
+    return recipes.map((r) => toDraft(r, 'photos', null, name));
+  } catch (e) {
+    throw friendlyError(e);
+  } finally {
+    await meter.save(found > 0, Math.max(found, 1)).catch(() => {});
+  }
 }
 
 /** For pages the phone can't download directly (some sites block apps), let Claude fetch it. */

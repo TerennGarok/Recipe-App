@@ -18,7 +18,7 @@ vi.mock('expo/fetch', () => ({
   },
 }));
 vi.mock('../src/lib/settings', () => ({ getAnthropicKey: async () => 'sk-ant-test' }));
-const saved: { kind: string; ok: boolean; models: string[] }[] = [];
+const saved: { kind: string; ok: boolean; models: string[]; count?: number }[] = [];
 vi.mock('../src/lib/spending', () => ({
   Meter: class {
     models: string[] = [];
@@ -26,14 +26,14 @@ vi.mock('../src/lib/spending', () => ({
     add(model: string) {
       this.models.push(model);
     }
-    async save(ok: boolean) {
-      saved.push({ kind: this.kind, ok, models: this.models });
+    async save(ok: boolean, count?: number) {
+      saved.push({ kind: this.kind, ok, models: this.models, ...(count && count > 1 ? { count } : {}) });
     }
   },
 }));
 vi.mock('../src/lib/media', () => ({ imageForClaude: async () => ({ base64: 'AAAA', mediaType: 'image/jpeg' }) }));
 
-const { recipeFromText, recipeFromPage, searchRecipes, ClaudeError } = await import('../src/lib/claude');
+const { recipeFromText, recipeFromPage, recipesFromPdf, searchRecipes, ClaudeError } = await import('../src/lib/claude');
 
 const message = (content: object[], stop_reason = 'end_turn') => ({
   id: 'msg_1',
@@ -120,6 +120,26 @@ describe('recipe extraction', () => {
       { kind: 'image', url: 'https://example.com/a.jpg' },
       { kind: 'video', url: 'https://youtube.com/watch?v=1' },
     ]);
+  });
+});
+
+describe('PDF import', () => {
+  it('sends the PDF as a document and returns every recipe in it', async () => {
+    const second = { ...recipeJson, title: 'Waffles' };
+    const notRecipe = { ...recipeJson, isRecipe: false, title: 'Index' };
+    replies = [message([{ type: 'text', text: JSON.stringify({ recipes: [recipeJson, notRecipe, second] }) }])];
+    const drafts = await recipesFromPdf('JVBERi0=', 'Grandma Collection.pdf');
+    expect(drafts.map((d) => d.title)).toEqual(['Pancakes', 'Waffles']);
+    expect(drafts[0].source.name).toBe('Grandma Collection');
+    const content = calls[0].body.messages[0].content;
+    expect(content[0]).toMatchObject({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: 'JVBERi0=' } });
+    expect(calls[0].body.max_tokens).toBe(32000);
+    expect(saved).toEqual([{ kind: 'recipe', ok: true, models: ['claude-opus-5-5'], count: 2 }]);
+  });
+
+  it('explains when a PDF has too many recipes for one request', async () => {
+    replies = [message([{ type: 'text', text: '{"recipes": [' }], 'max_tokens')];
+    await expect(recipesFromPdf('JVBERi0=', 'Big.pdf')).rejects.toThrow(/Split it into smaller PDFs/);
   });
 });
 

@@ -65,7 +65,7 @@
               "supportsWebUrlWithMaxCount": 1,
               "supportsWebPageWithMaxCount": 1,
               "supportsImageWithMaxCount": 10,
-              "supportsFileWithMaxCount": 1
+              "supportsFileWithMaxCount": 10
             }
           },
           "android": {
@@ -74,10 +74,12 @@
               "text/plain",
               "image/*",
               "application/json",
+              "application/pdf",
               "application/octet-stream"
             ],
             "multipleShareMimeTypes": [
-              "image/*"
+              "image/*",
+              "application/pdf"
             ]
           }
         }

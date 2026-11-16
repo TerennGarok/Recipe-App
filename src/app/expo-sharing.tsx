@@ -21,9 +21,10 @@ export default function SharedInto() {
     if (done.current || isResolving) return;
     done.current = true;
     const payloads = resolvedSharedPayloads;
-    clearSharedPayloads();
     router.replace('/');
-    if (payloads.length) handleSharedPayloads(payloads);
+    // Copy shared files first: clearing deletes expo-sharing's copies of them.
+    if (payloads.length) handleSharedPayloads(payloads).finally(clearSharedPayloads);
+    else clearSharedPayloads();
   }, [isResolving, resolvedSharedPayloads, clearSharedPayloads, error]);
 
   return (

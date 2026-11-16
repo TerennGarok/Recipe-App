@@ -21,8 +21,8 @@ function IncomingShareHandler() {
   useEffect(() => {
     if (pathname === '/expo-sharing' || isResolving || resolvedSharedPayloads.length === 0) return;
     const payloads = resolvedSharedPayloads;
-    clearSharedPayloads();
-    handleSharedPayloads(payloads);
+    // Copy shared files first: clearing deletes expo-sharing's copies of them.
+    handleSharedPayloads(payloads).finally(clearSharedPayloads);
   }, [pathname, resolvedSharedPayloads, isResolving, clearSharedPayloads]);
 
   return null;

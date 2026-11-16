@@ -1,3 +1,4 @@
+import { File } from 'expo-file-system';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -9,6 +10,7 @@ import { Button, Card, Chip, Field, Icon, T } from '@/components/ui';
 import { Radius, Spacing, useTheme } from '@/constants/theme';
 import {
   addLinks,
+  addPdfs,
   addPhotos,
   batchPhotoUri,
   canCombine,
@@ -65,14 +67,16 @@ function ItemRow({ item, index, items }: { item: BatchItem; index: number; items
           </View>
         ) : (
           <View style={[styles.thumb, { backgroundColor: t.chip, alignItems: 'center', justifyContent: 'center', borderColor: t.card }]}>
-            <Icon name="link" color={t.primary} />
+            <Icon name={item.kind === 'pdf' ? 'document-text-outline' : 'link'} color={t.primary} />
           </View>
         )}
         <Pressable style={{ flex: 1, gap: 2 }} disabled={!item.recipeId} onPress={() => item.recipeId && router.push(`/recipe/${item.recipeId}`)}>
           <T numberOfLines={2} style={{ fontWeight: '600' }}>
-            {item.title ?? (item.kind === 'link' ? item.url?.replace(/^https?:\/\/(www\.)?/, '') : `Recipe ${index + 1}`)}
+            {item.title ?? (item.kind === 'link' ? item.url?.replace(/^https?:\/\/(www\.)?/, '') : item.kind === 'pdf' ? item.fileName : `Recipe ${index + 1}`)}
           </T>
-          <T kind="small">{item.kind === 'photos' ? `${item.pages.length} photo${item.pages.length > 1 ? 's' : ''}` : 'Web link'}</T>
+          <T kind="small">
+            {item.kind === 'photos' ? `${item.pages.length} photo${item.pages.length > 1 ? 's' : ''}` : item.kind === 'pdf' ? 'PDF — every recipe in it is added' : 'Web link'}
+          </T>
           {item.error ? (
             <T kind="small" style={{ color: t.danger }} numberOfLines={3}>
               {item.error}
@@ -86,7 +90,11 @@ function ItemRow({ item, index, items }: { item: BatchItem; index: number; items
           {editable && canCombine(items, item.id) ? <Chip label="Same recipe as above" icon="git-merge-outline" onPress={() => combine(item.id)} /> : null}
           {editable && item.pages.length > 1 ? <Chip label="Split into separate recipes" icon="git-branch-outline" onPress={() => split(item.id)} /> : null}
           {item.status === 'failed' ? <Chip label="Retry" icon="refresh" onPress={() => retry(item.id)} /> : null}
-          {item.status === 'done' && item.recipeId ? <Chip label="Open recipe" icon="book-outline" onPress={() => router.push(`/recipe/${item.recipeId}`)} /> : null}
+          {item.status === 'done'
+            ? (item.results ?? (item.recipeId ? [{ id: item.recipeId, title: item.title ?? 'Recipe' }] : [])).map((r) => (
+                <Chip key={r.id} label={(item.results?.length ?? 1) > 1 ? r.title : 'Open recipe'} icon="book-outline" onPress={() => router.push(`/recipe/${r.id}`)} />
+              ))
+            : null}
           {editable ? <Chip label="Remove" icon="trash-outline" onPress={() => removeItem(item.id)} /> : null}
         </View>
       ) : null}
@@ -121,6 +129,13 @@ export default function Batch() {
     }
   }
 
+  async function choosePdfs() {
+    const picked = await File.pickFileAsync({ mimeTypes: ['application/pdf'], multipleFiles: true });
+    if (picked.canceled) return;
+    const tooBig = await addPdfs(picked.result.map((f) => ({ uri: f.uri, name: f.name })));
+    if (tooBig.length) Alert.alert('Some PDFs are too large', `${tooBig.join(', ')} ${tooBig.length > 1 ? 'are' : 'is'} over 30 MB. Split ${tooBig.length > 1 ? 'them' : 'it'} into smaller PDFs.`);
+  }
+
   const remaining = summary.waiting + summary.working;
   const estimate = spending?.avgPerRecipe != null && remaining ? ` · about ${formatUsd(spending.avgPerRecipe * remaining)}` : '';
 
@@ -134,12 +149,13 @@ export default function Batch() {
         ListHeaderComponent={
           <View style={{ gap: Spacing.md }}>
             <T kind="secondary">
-              Queue up a stack of recipe cards or links, then let Claude work through them. Each photo becomes its own recipe — tap “Same recipe as above” for the back of a card or a second page.
+              Queue up a stack of recipe cards, PDFs or links, then let Claude work through them. Each photo becomes its own recipe — tap “Same recipe as above” for the back of a card or a second page. A PDF can hold many recipes; each one is added.
             </T>
             <Card style={{ gap: Spacing.md }}>
               <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-                <Button title="Choose photos" icon="images-outline" onPress={() => add(async () => addPhotos(await pickFromLibrary('photos')))} style={{ flex: 1 }} loading={adding} />
-                <Button title="Take photos" icon="camera-outline" variant="secondary" onPress={() => add(takeMany)} style={{ flex: 1 }} />
+                <Button title="Photos" icon="images-outline" onPress={() => add(async () => addPhotos(await pickFromLibrary('photos')))} style={{ flex: 1 }} loading={adding} />
+                <Button title="Camera" icon="camera-outline" variant="secondary" onPress={() => add(takeMany)} style={{ flex: 1 }} />
+                <Button title="PDFs" icon="document-text-outline" variant="secondary" onPress={() => add(choosePdfs)} style={{ flex: 1 }} />
               </View>
               <Field value={links} onChangeText={setLinks} multiline style={{ minHeight: 70 }} placeholder="Paste recipe links, one per line" autoCapitalize="none" autoCorrect={false} />
               <Button
