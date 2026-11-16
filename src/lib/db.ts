@@ -28,6 +28,15 @@ export function getDb(): SQLiteDatabase {
         ok INTEGER NOT NULL
       );
       CREATE TABLE IF NOT EXISTS app_kv (key TEXT PRIMARY KEY NOT NULL, value TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS meal_plan (
+        id TEXT PRIMARY KEY NOT NULL,
+        day TEXT NOT NULL,
+        meal TEXT NOT NULL,
+        recipe_id TEXT,
+        title TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS meal_plan_day ON meal_plan(day);
     `);
   }
   return db;

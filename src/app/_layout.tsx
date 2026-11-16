@@ -5,7 +5,9 @@ import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
 import { Colors } from '@/constants/theme';
+import { TimerTray } from '@/components/timers';
 import { handleSharedPayloads } from '@/lib/incoming';
+import { initTimers } from '@/lib/timers';
 
 /**
  * Handles items shared while the app is already open. (When the app is closed, the system
@@ -27,6 +29,9 @@ function IncomingShareHandler() {
 
 export default function RootLayout() {
   const scheme = useColorScheme();
+  useEffect(() => {
+    initTimers();
+  }, []);
   const palette = Colors[scheme === 'dark' ? 'dark' : 'light'];
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
   const theme = {
@@ -44,8 +49,11 @@ export default function RootLayout() {
         <Stack.Screen name="recipe/[id]" options={{ title: '' }} />
         <Stack.Screen name="edit/[id]" options={{ title: 'Edit recipe', presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="planner" options={{ title: 'Meal plan' }} />
+        <Stack.Screen name="ideas" options={{ title: 'Meal ideas' }} />
         <Stack.Screen name="expo-sharing" options={{ headerShown: false, animation: 'none' }} />
       </Stack>
+      <TimerTray />
     </ThemeProvider>
   );
 }

@@ -8,10 +8,15 @@ import { ImageEditor } from '@/components/image-editor';
 import { LineEditor, type LineEdit } from '@/components/line-editor';
 import { ListPickerSheet } from '@/components/list-picker';
 import { MediaGallery } from '@/components/media-gallery';
+import { PlanRecipeSheet } from '@/components/plan-sheets';
+import { StepTimerButton } from '@/components/timers';
 import { BusyOverlay, Button, Chip, Icon, IconButton, PromptModal, T } from '@/components/ui';
 import { Radius, Spacing, useTheme } from '@/constants/theme';
 import type { ShoppingItemInput } from '@/lib/anylist/client';
 import { saveRecipe, useRecipe } from '@/lib/db';
+import { findDurations } from '@/lib/durations';
+import { useRecipePlanDays } from '@/lib/mealplan';
+import { MEAL_LABEL, dayLabel, toKey } from '@/lib/week';
 import { groupBySection, parseIngredientLine } from '@/lib/ingredients';
 import { pickFromLibrary, takeWithCamera } from '@/lib/pick';
 import { mediaUri } from '@/lib/media';
@@ -68,6 +73,9 @@ export default function RecipeScreen() {
   const [lineEdit, setLineEdit] = useState<LineEdit | null>(null);
   const [cropping, setCropping] = useState<Media | null>(null);
   const [newPhoto, setNewPhoto] = useState<LocalAsset | null>(null);
+  const [planning, setPlanning] = useState(false);
+  const today = toKey(new Date());
+  const planned = useRecipePlanDays(id, today);
 
   if (recipe === undefined) {
     return (
@@ -127,6 +135,7 @@ export default function RecipeScreen() {
   function moreMenu() {
     chooseAction(r.title, [
       { label: 'Edit recipe', onPress: () => router.push(`/edit/${r.id}`) },
+      { label: 'Add to meal plan', onPress: () => setPlanning(true) },
       { label: 'Share with family', onPress: () => withBusy('Preparing file…', () => shareRecipes([r]).then((w) => w.length && Alert.alert('Note', w.join('\n')))) },
       ...(r.source.url ? [{ label: 'Open original page', onPress: () => WebBrowser.openBrowserAsync(r.source.url!) }] : []),
       {
@@ -175,6 +184,12 @@ export default function RecipeScreen() {
             </Pressable>
           ) : null}
           {r.description ? <T kind="secondary">{r.description}</T> : null}
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.xs, marginTop: Spacing.xs }}>
+            <Chip label="Add to meal plan" icon="calendar-outline" onPress={() => setPlanning(true)} />
+            {planned.slice(0, 3).map((p) => (
+              <Chip key={p.id} label={`${dayLabel(p.day, today)} · ${MEAL_LABEL[p.meal]}`} icon="checkmark" onPress={() => router.push('/planner')} />
+            ))}
+          </View>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.lg, marginTop: Spacing.sm }}>
             <Meta label="Serves" value={r.servings} />
             <Meta label="Prep" value={r.prepTime} />
@@ -248,7 +263,16 @@ export default function RecipeScreen() {
                     <View style={[styles.stepNum, { backgroundColor: done ? t.accent : t.primary }]}>
                       {done ? <Icon name="checkmark" size={16} color={t.primaryText} /> : <T style={{ color: t.primaryText, fontWeight: '700' }}>{n}</T>}
                     </View>
-                    <T style={{ flex: 1, opacity: done ? 0.5 : 1 }}>{s.text}</T>
+                    <View style={{ flex: 1 }}>
+                      <T style={{ opacity: done ? 0.5 : 1 }}>{s.text}</T>
+                      {findDurations(s.text).length ? (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs }}>
+                          {findDurations(s.text).map((d) => (
+                            <StepTimerButton key={d.label} duration={d} recipeId={r.id} recipeTitle={r.title} step={n} />
+                          ))}
+                        </View>
+                      ) : null}
+                    </View>
                   </Pressable>
                 );
               })}
@@ -284,6 +308,7 @@ export default function RecipeScreen() {
           setSelected(new Set());
         }}
       />
+      <PlanRecipeSheet recipe={r} visible={planning} onClose={() => setPlanning(false)} />
       <ImageEditor
         uri={cropping ? mediaUri(cropping) : null}
         onCancel={() => setCropping(null)}
