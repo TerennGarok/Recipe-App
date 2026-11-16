@@ -14,6 +14,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { useKeyboardHeight } from '@/components/keyboard';
 import { Radius, Spacing, useTheme } from '@/constants/theme';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -172,10 +173,11 @@ export function PromptModal({
   initialValue?: string;
 }) {
   const t = useTheme();
+  const kb = useKeyboardHeight();
   const [value, setValue] = useState('');
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel} onShow={() => setValue(initialValue)}>
-      <View style={styles.overlay}>
+      <View style={[styles.overlay, { paddingBottom: kb + Spacing.xl }]}>
         <View style={[styles.overlayBox, { backgroundColor: t.card, alignItems: 'stretch', width: '100%' }]}>
           <T kind="heading">{title}</T>
           {message ? <T kind="secondary">{message}</T> : null}
