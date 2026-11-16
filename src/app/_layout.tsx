@@ -7,6 +7,7 @@ import { useColorScheme } from 'react-native';
 import { Colors } from '@/constants/theme';
 import { TimerTray } from '@/components/timers';
 import { handleSharedPayloads } from '@/lib/incoming';
+import { initBatch } from '@/lib/batch';
 import { initTimers } from '@/lib/timers';
 
 /**
@@ -31,6 +32,7 @@ export default function RootLayout() {
   const scheme = useColorScheme();
   useEffect(() => {
     initTimers();
+    initBatch();
   }, []);
   const palette = Colors[scheme === 'dark' ? 'dark' : 'light'];
   const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
@@ -51,6 +53,7 @@ export default function RootLayout() {
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
         <Stack.Screen name="planner" options={{ title: 'Meal plan' }} />
         <Stack.Screen name="ideas" options={{ title: 'Meal ideas' }} />
+        <Stack.Screen name="batch" options={{ title: 'Batch import' }} />
         <Stack.Screen name="expo-sharing" options={{ headerShown: false, animation: 'none' }} />
       </Stack>
       <TimerTray />

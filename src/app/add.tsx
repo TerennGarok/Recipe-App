@@ -1,9 +1,10 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Image } from 'expo-image';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
 import { ImageEditor } from '@/components/image-editor';
+import { KeyboardSafeView } from '@/components/keyboard';
 import { BusyOverlay, Button, Card, Field, Icon, IconButton, T } from '@/components/ui';
 import { Spacing, useTheme } from '@/constants/theme';
 import { recipeFromPhotos, recipeFromText } from '@/lib/claude';
@@ -103,7 +104,7 @@ export default function AddRecipe() {
   }, [params.url]);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardSafeView style={{ backgroundColor: t.background }}>
       <ScrollView contentContainerStyle={{ padding: Spacing.lg, gap: Spacing.lg, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
         <Card style={{ gap: Spacing.md }}>
           <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
@@ -173,6 +174,17 @@ export default function AddRecipe() {
           <Button title="Clean up with Claude" icon="sparkles-outline" onPress={fromText} disabled={!text.trim()} />
         </Card>
 
+        <Card style={{ gap: Spacing.md }} onPress={() => router.replace('/batch')}>
+          <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
+            <Icon name="layers-outline" color={t.primary} />
+            <T kind="heading" style={{ flex: 1 }}>
+              Many recipes at once
+            </T>
+            <Icon name="chevron-forward" color={t.textSecondary} />
+          </View>
+          <T kind="secondary">Got a stack of recipe cards or a list of links? Queue them all and let Claude work through them.</T>
+        </Card>
+
         <Button title="Type it in myself" variant="ghost" icon="create-outline" onPress={() => router.replace('/edit/new')} />
       </ScrollView>
       <ImageEditor
@@ -186,7 +198,7 @@ export default function AddRecipe() {
         }}
       />
       <BusyOverlay message={busy} />
-    </KeyboardAvoidingView>
+    </KeyboardSafeView>
   );
 }
 

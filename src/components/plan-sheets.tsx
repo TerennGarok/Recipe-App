@@ -1,7 +1,8 @@
 import { useState, type ReactNode } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useKeyboardHeight } from '@/components/keyboard';
 import { Button, Chip, Field, Icon, T } from '@/components/ui';
 import { Radius, Spacing, useTheme } from '@/constants/theme';
 import { useRecipeList } from '@/lib/db';
@@ -12,15 +13,17 @@ import { MEALS, MEAL_LABEL, addDays, dayLabel, suggestRecipes, toKey, type Meal 
 function Sheet({ visible, onClose, onShow, children }: { visible: boolean; onClose: () => void; onShow?: () => void; children: ReactNode }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  const kb = useKeyboardHeight();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} onShow={onShow}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={{ flex: 1 }}>
         <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
-        <View style={[styles.sheet, { backgroundColor: t.card, paddingBottom: insets.bottom + Spacing.lg }]}>
+        {/* Sits on top of the keyboard while typing (see useKeyboardHeight). */}
+        <View style={[styles.sheet, { backgroundColor: t.card, paddingBottom: Math.max(insets.bottom, kb) + Spacing.lg }]}>
           <View style={[styles.grabber, { backgroundColor: t.border }]} />
           {children}
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }

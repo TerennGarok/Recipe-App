@@ -1,7 +1,8 @@
 import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 
+import { KeyboardSafeView } from '@/components/keyboard';
 import { BusyOverlay, Button, Field, T } from '@/components/ui';
 import { Spacing, useTheme } from '@/constants/theme';
 import { recipeFromText } from '@/lib/claude';
@@ -135,7 +136,7 @@ export default function EditRecipe() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardSafeView style={{ backgroundColor: t.background }}>
       <Stack.Screen
         options={{
           title: isNew ? 'New recipe' : 'Edit recipe',
@@ -171,6 +172,6 @@ export default function EditRecipe() {
         <Button title={isNew ? 'Save recipe' : 'Save changes'} icon="checkmark" onPress={save} />
       </ScrollView>
       <BusyOverlay message={busy} />
-    </KeyboardAvoidingView>
+    </KeyboardSafeView>
   );
 }

@@ -1,9 +1,10 @@
 import { File } from 'expo-file-system';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { Alert, ScrollView, View } from 'react-native';
 
 import { invalidateListCache } from '@/components/list-picker';
+import { KeyboardSafeView } from '@/components/keyboard';
 import { BusyOverlay, Button, Card, Field, Icon, PromptModal, T } from '@/components/ui';
 import { Spacing, useTheme } from '@/constants/theme';
 import { signIn, signOut } from '@/lib/anylist/client';
@@ -63,7 +64,7 @@ export default function Settings() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardSafeView style={{ backgroundColor: t.background }}>
       <ScrollView contentContainerStyle={{ padding: Spacing.lg, gap: Spacing.lg, paddingBottom: 60 }} keyboardShouldPersistTaps="handled">
         <Card style={{ gap: Spacing.md }}>
           <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
@@ -223,6 +224,6 @@ export default function Settings() {
         }}
       />
       <BusyOverlay message={busy} />
-    </KeyboardAvoidingView>
+    </KeyboardSafeView>
   );
 }

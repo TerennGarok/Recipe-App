@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { RecipeRow } from '@/components/recipe-row';
 import { Button, Card, Chip, Icon, IconButton, T } from '@/components/ui';
 import { Radius, Spacing, useTheme } from '@/constants/theme';
+import { useBatch } from '@/lib/batch';
 import { useRecipeList } from '@/lib/db';
 import { useHasAnthropicKey } from '@/lib/settings';
 
@@ -16,6 +17,8 @@ export default function Home() {
   const [favorites, setFavorites] = useState(false);
   const recipes = useRecipeList(query, favorites);
   const hasKey = useHasAnthropicKey();
+  const batch = useBatch();
+  const batchLeft = batch.summary.waiting + batch.summary.working;
 
   return (
     <View style={{ flex: 1, backgroundColor: t.background }}>
@@ -46,6 +49,19 @@ export default function Home() {
                     <T style={{ color: t.primary, fontWeight: '600' }}>Open Settings →</T>
                   </Pressable>
                 </Link>
+              </Card>
+            ) : null}
+            {batchLeft || batch.summary.failed ? (
+              <Card onPress={() => router.push('/batch')} style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md, padding: Spacing.md, borderColor: t.primary }}>
+                <Icon name="layers-outline" color={t.primary} />
+                <T style={{ flex: 1 }}>
+                  {batch.running
+                    ? `Importing recipes… ${batch.summary.done} of ${batch.summary.total} done`
+                    : batchLeft
+                      ? `${batchLeft} recipe${batchLeft > 1 ? 's' : ''} waiting in batch import`
+                      : `${batch.summary.failed} batch import${batch.summary.failed > 1 ? 's' : ''} failed`}
+                </T>
+                <Icon name="chevron-forward" color={t.textSecondary} />
               </Card>
             ) : null}
             <View style={[styles.search, { backgroundColor: t.card, borderColor: t.border }]}>
