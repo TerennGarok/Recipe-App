@@ -19,10 +19,16 @@ export class Meter {
     this.total += costUsd(model, usage);
   }
 
-  /** Record the action. Failed actions still cost money, but don't count toward the per-recipe average. */
-  async save(ok: boolean) {
+  /**
+   * Record the action. Failed actions still cost money, but don't count toward the per-recipe average.
+   * `count` > 1 (a PDF with several recipes) splits the cost evenly across those recipes.
+   */
+  async save(ok: boolean, count = 1) {
     if (this.total === 0) return;
-    await getDb().runAsync('INSERT INTO claude_usage (at, kind, cost, ok) VALUES (?, ?, ?, ?)', [Date.now(), this.kind, this.total, ok ? 1 : 0]);
+    const now = Date.now();
+    for (let i = 0; i < count; i++) {
+      await getDb().runAsync('INSERT INTO claude_usage (at, kind, cost, ok) VALUES (?, ?, ?, ?)', [now, this.kind, this.total / count, ok ? 1 : 0]);
+    }
     notify();
   }
 }

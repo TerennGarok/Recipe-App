@@ -7,7 +7,7 @@ A personal, on-device recipe box for iPhone and Android. Claude reads, cleans up
 | | |
 |---|---|
 | **Scan paper recipes** | Photograph a recipe card or cookbook page (multiple pages or the back of a card are fine), and crop or rotate each photo before Claude reads it. Claude reads handwriting, applies handwritten changes (a crossed-out amount with a new one written in) to the recipe itself and lists them in the notes, fixes typos and standardizes formatting. The original photos can stay attached. |
-| **Batch import** | **Add → Many recipes at once**: queue a stack of photos (each becomes its own recipe; mark the back of a card as "Same recipe as above") and/or a list of links, then let Claude process them two at a time. Failed items can be retried, and the queue is saved if you leave the app (tap **Resume** to continue). |
+| **Batch import** | **Add → Many recipes at once**: queue a stack of photos (each becomes its own recipe; mark the back of a card as "Same recipe as above"), PDFs (every recipe in a PDF is added; up to 30 MB each — you can also share PDFs to RecipeBox) and/or a list of links, then let Claude process them two at a time. Failed items can be retried, and the queue is saved if you leave the app (tap **Resume** to continue). |
 | **Import from websites** | Paste a link, or in Safari/Chrome tap **Share → RecipeBox**. The app pulls the recipe out of the page (skipping the ads and the life story) along with the main photo and any video. |
 | **Paste text** | Recipes from emails, texts or notes get cleaned up into the same format. |
 | **Find recipes online** | Ask for "weeknight chicken thighs" and Claude searches the web, favoring well-reviewed recipes from reputable sources. Preview a result, then save the ones you like. |

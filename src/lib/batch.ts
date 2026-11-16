@@ -8,7 +8,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { useSyncExternalStore } from 'react';
 
 import { canCombine, combineWithPrevious, nextToRun, parseLinks, resetInterrupted, splitPages, summarize, type BatchItem } from './batchqueue';
-import { recipeFromPhotos } from './claude';
+import { MAX_PDF_BYTES, recipeFromPhotos, recipesFromPdf } from './claude';
 import { getDb } from './db';
 import { newId } from './id';
 import { createRecipe, draftFromUrl, type LocalAsset } from './recipes';
@@ -73,6 +73,27 @@ export async function addPhotos(assets: LocalAsset[]): Promise<void> {
   set({ items: [...state.items, ...added] });
 }
 
+/**
+ * Queue PDFs (each may hold one recipe or several). Returns the names of files that were too
+ * large to send to Claude and were skipped.
+ */
+export async function addPdfs(files: { uri: string; name: string }[]): Promise<string[]> {
+  const added: BatchItem[] = [];
+  const tooBig: string[] = [];
+  for (const f of files) {
+    const src = new File(f.uri);
+    if (src.size > MAX_PDF_BYTES) {
+      tooBig.push(f.name);
+      continue;
+    }
+    const name = `${newId()}.pdf`;
+    await src.copy(new File(batchDir(), name));
+    added.push({ id: newId(), kind: 'pdf', pages: [name], url: null, fileName: f.name, status: 'waiting', error: null, recipeId: null, title: null });
+  }
+  set({ items: [...state.items, ...added] });
+  return tooBig;
+}
+
 /** Returns how many new links were queued. */
 export function addLinks(text: string): number {
   const known = new Set(state.items.map((i) => i.url));
@@ -121,6 +142,23 @@ async function processItem(item: BatchItem) {
   try {
     let recipeId: string;
     let title: string;
+    if (item.kind === 'pdf') {
+      const base64 = await new File(Paths.document, 'batch', item.pages[0]).base64();
+      const drafts = await recipesFromPdf(base64, item.fileName ?? 'PDF');
+      const results: { id: string; title: string }[] = [];
+      for (const d of drafts) {
+        const r = await createRecipe(d);
+        results.push({ id: r.id, title: r.title });
+      }
+      deletePhotos(item.pages);
+      update(item.id, {
+        status: 'done',
+        results,
+        recipeId: results.length === 1 ? results[0].id : null,
+        title: results.length === 1 ? results[0].title : `${results.length} recipes from ${item.fileName ?? 'PDF'}`,
+      });
+      return;
+    }
     if (item.kind === 'link' && item.url) {
       const r = await createRecipe(await draftFromUrl(item.url));
       recipeId = r.id;
@@ -136,7 +174,7 @@ async function processItem(item: BatchItem) {
       title = r.title;
       deletePhotos(item.pages); // the recipe has its own copies now
     }
-    update(item.id, { status: 'done', recipeId, title });
+    update(item.id, { status: 'done', recipeId, title, results: [{ id: recipeId, title }] });
   } catch (e) {
     update(item.id, { status: 'failed', error: (e as Error).message });
   }

@@ -4,10 +4,14 @@ export type BatchStatus = 'waiting' | 'working' | 'done' | 'failed';
 
 export type BatchItem = {
   id: string;
-  kind: 'photos' | 'link';
-  /** Photo file names in the batch folder, in page order (one recipe can span several photos). */
+  kind: 'photos' | 'link' | 'pdf';
+  /** Files in the batch folder: photos in page order (one recipe can span several photos), or one PDF. */
   pages: string[];
   url: string | null;
+  /** Original name of a PDF, for display. */
+  fileName?: string | null;
+  /** Every recipe created from this item (a PDF can hold several). */
+  results?: { id: string; title: string }[];
   status: BatchStatus;
   error: string | null;
   recipeId: string | null;
